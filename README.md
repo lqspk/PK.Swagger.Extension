@@ -11,3 +11,7 @@ GlobalConfiguration.Configuration
                         c.InjectExportScript();
                     });
 ```                    
+
+
+导出方法：
+项目运行后，访问swagger页面，有一个“导出到markdown”按钮，点击即可。
