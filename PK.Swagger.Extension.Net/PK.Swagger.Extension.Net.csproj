@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RepositoryUrl>https://github.com/lqspk/PK.Swagger.Extension</RepositoryUrl>
+    <Authors>PK</Authors>
   </PropertyGroup>
 
   <ItemGroup>
