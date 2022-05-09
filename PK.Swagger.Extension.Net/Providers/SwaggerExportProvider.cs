@@ -254,6 +254,8 @@ namespace PK.Swagger.Extension.Net.Providers
                 {
                     sb.AppendLine($"|{prop.Name}|{prop.Type}|{prop.Format}|{prop.Description}|");
                 }
+
+                sb.AppendLine("");
             }
 
             return sb;
@@ -340,6 +342,8 @@ namespace PK.Swagger.Extension.Net.Providers
                     //表格行
                     sb.AppendLine($"|{prop.Name}|{prop.Type}|{prop.Format}|{prop.Description}|");
                 }
+
+                sb.AppendLine("");
             }
 
             return sb;
