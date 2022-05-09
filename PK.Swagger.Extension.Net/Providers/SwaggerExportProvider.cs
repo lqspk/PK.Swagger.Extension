@@ -206,7 +206,7 @@ namespace PK.Swagger.Extension.Net.Providers
                             refClass = refClass.Replace("#/definitions/", "");
 
                         //添加表格行
-                        sb.AppendLine($"|{item.Name}|{refClass}|{item.DataFormat}|{item.Description}|{item.IsRequired}|");
+                        sb.AppendLine($"|{item.Name}|{refClass}|{item.DataFormat}|{item.Description?.Replace("\r\n", "<br/>")}|{(item.IsRequired == true ? "是" : "否")}|");
                     }
 
                     sb.AppendLine("");
@@ -237,7 +237,7 @@ namespace PK.Swagger.Extension.Net.Providers
                 {
                     if (!string.IsNullOrWhiteSpace(prop.Description))
                     {
-                        sb.AppendLine($"  //{prop.Description}");
+                        sb.AppendLine($"  //{prop.Description.Replace("\r\n", "<br/>")}");
                     }
                     sb.AppendLine($"  \"{prop.Name}\": null, //数据类型：{prop.Type}");
                     sb.AppendLine("");
@@ -252,7 +252,7 @@ namespace PK.Swagger.Extension.Net.Providers
                 sb.AppendLine("|-|-|-|-|");
                 foreach (var prop in interfaceDefinition.ResponseProperties)
                 {
-                    sb.AppendLine($"|{prop.Name}|{prop.Type}|{prop.Format}|{prop.Description}|");
+                    sb.AppendLine($"|{prop.Name}|{prop.Type}|{prop.Format}|{prop.Description?.Replace("\r\n", "<br/>")}|");
                 }
 
                 sb.AppendLine("");
