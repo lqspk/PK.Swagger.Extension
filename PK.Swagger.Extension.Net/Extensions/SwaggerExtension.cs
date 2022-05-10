@@ -3,6 +3,8 @@
 */
 
 using System;
+using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using Swashbuckle.Application;
@@ -16,6 +18,20 @@ namespace PK.Swagger.Extension.Net.Extensions
     /// </summary>
     public static class SwaggerExtension
     {
+        /// <summary>
+        /// 自动包括XML注释文件
+        /// </summary>
+        /// <param name="config"></param>
+        /// <param name="paths"></param>
+        public static void AutoIncludeXmlComments(this SwaggerDocsConfig config, string[] xmlFilePaths = null)
+        {
+            if (xmlFilePaths == null)
+                xmlFilePaths = GetXmlCommentsPaths();
+            foreach (var path in xmlFilePaths) {
+                config.IncludeXmlComments(path);
+            }
+        }
+
         /// <summary>
         /// 启用Swagger导出
         /// </summary>
@@ -31,7 +47,7 @@ namespace PK.Swagger.Extension.Net.Extensions
                 constraints: null,
                 handler: (HttpMessageHandler)new SwaggerExportRequestHandler()
             );
-            
+
             return config;
         }
 
@@ -57,6 +73,17 @@ namespace PK.Swagger.Extension.Net.Extensions
             FieldInfo field = type.GetField("_httpConfig", flag);
             var result = field.GetValue(instance);
             return (HttpConfiguration)result;
+        }
+
+        /// <summary>
+        /// 自动获取程序目录下的xml文件
+        /// </summary>
+        /// <returns></returns>
+        private static string[] GetXmlCommentsPaths() {
+            DirectoryInfo folder = new DirectoryInfo($"{System.AppDomain.CurrentDomain.BaseDirectory}\\bin\\");
+            var files = folder.GetFiles("*.xml");
+
+            return files.Select(s => s.FullName).ToArray();
         }
     }
 }

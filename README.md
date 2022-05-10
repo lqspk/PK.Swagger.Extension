@@ -5,12 +5,16 @@ Swagger接口导出到MarkDown文档
 
 ```C#
 GlobalConfiguration.Configuration
-.EnableSwaggerExport()
-.EnableSwaggerUi(c =>
+    .EnableSwagger(c =>
+                   {
+                       c.AutoIncludeXmlComments(); //自动包括bin目录下的所有XML文件
+                   })
+    .EnableSwaggerExport() //启用导出功能
+    .EnableSwaggerUi(c =>
                     {
-                        c.InjectExportScript();
+                        c.InjectExportScript(); //添加swagger页面导出按钮
                     });
-```                    
+```
 
 
 导出方法：
