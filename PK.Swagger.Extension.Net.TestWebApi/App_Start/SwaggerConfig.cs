@@ -4,6 +4,7 @@ using PK.Swagger.Extension.Net.TestWebApi;
 using Swashbuckle.Application;
 using PK.Swagger.Extension.Net.Extensions;
 using System;
+using System.IO;
 using System.Linq;
 using System.Xml.XPath;
 
@@ -105,7 +106,11 @@ namespace PK.Swagger.Extension.Net.TestWebApi
                         // those comments into the generated docs and UI. You can enable this by providing the path to one or
                         // more Xml comment files.
                         //
-                        c.IncludeXmlComments(GetXmlCommentsPath());
+
+                        foreach (var path in GetXmlCommentsPaths())
+                        {
+                            c.IncludeXmlComments(path);
+                        }
 
                         // Swashbuckle makes a best attempt at generating Swagger compliant JSON schemas for the various types
                         // exposed in your API. However, there may be occasions when more control of the output is needed.
@@ -261,9 +266,11 @@ namespace PK.Swagger.Extension.Net.TestWebApi
 
         }
 
-        private static string GetXmlCommentsPath()
-        {
-            return System.AppDomain.CurrentDomain.BaseDirectory + "bin\\PK.Swagger.Extension.Net.TestWebApi.xml";
+        private static string[] GetXmlCommentsPaths() {
+            DirectoryInfo folder = new DirectoryInfo($"{System.AppDomain.CurrentDomain.BaseDirectory}\\bin\\");
+            var files = folder.GetFiles("*.xml");
+
+            return files.Select(s => s.FullName).ToArray();
         }
     }
 }

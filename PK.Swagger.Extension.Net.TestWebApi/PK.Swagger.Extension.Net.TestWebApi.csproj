@@ -205,6 +205,10 @@
     <Content Include="Scripts\jquery-3.4.1.min.map" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\PK.Swagger.Extension.Net.TestModel\PK.Swagger.Extension.Net.TestModel.csproj">
+      <Project>{AA58AA6C-9666-4664-B0FF-ADD7EE67716B}</Project>
+      <Name>PK.Swagger.Extension.Net.TestModel</Name>
+    </ProjectReference>
     <ProjectReference Include="..\PK.Swagger.Extension.Net\PK.Swagger.Extension.Net.csproj">
       <Project>{88568466-c486-49fc-b3df-b4d0b85ae520}</Project>
       <Name>PK.Swagger.Extension.Net</Name>

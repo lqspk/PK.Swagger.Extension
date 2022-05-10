@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
+using PK.Swagger.Extension.Net.TestModel;
 using PK.Swagger.Extension.Net.TestWebApi.Results;
 
 namespace PK.Swagger.Extension.Net.TestWebApi.Controllers
@@ -52,6 +53,12 @@ namespace PK.Swagger.Extension.Net.TestWebApi.Controllers
         public string GetTime()
         {
             return DateTime.Now.ToString("yyyy-MM-dd");
+        }
+
+        [Route("getuserinfo")]
+        public TestModel.TestModel GetUserInfo()
+        {
+            return new TestModel.TestModel();
         }
 
     }
