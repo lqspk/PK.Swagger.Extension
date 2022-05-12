@@ -136,8 +136,13 @@ namespace PK.Swagger.Extension.Net.Providers {
         private static List<Type> GetSubClasses<T>() {
             List<Type> types = new List<Type>();
             foreach (System.Reflection.Assembly assembly in System.AppDomain.CurrentDomain.GetAssemblies()) {
-                types.AddRange(assembly.GetTypes().Where(
+                try {
+                    types.AddRange(assembly.GetTypes().Where(
                         type => type.IsSubclassOf(typeof(T))).ToList());
+                }
+                catch
+                {
+                }
             }
 
             return types;
@@ -256,10 +261,10 @@ namespace PK.Swagger.Extension.Net.Providers {
                 {
                     name = parameterInfo.Name,
                     @in = "query",
-                    description = node.SelectSingleNode($"//param[@name='{parameterInfo.Name}']")?.InnerText,
+                    description = node?.SelectSingleNode($"//param[@name='{parameterInfo.Name}']")?.InnerText,
                     required = (parameterInfo.HasDefaultValue == false && parameterInfo.ParameterType.IsValueType == true) 
                                && parameterInfo.ParameterType.Name.Contains("Nullable`1") == false,
-                    type = paramterType.Item1,
+                    type = paramterType?.Item1,
                     format = ""//paramterType.Item2
                 };
 
@@ -279,6 +284,11 @@ namespace PK.Swagger.Extension.Net.Providers {
             if (parameterInfo.ParameterType.Name.Contains("Nullable`1") == false)
             {
                 var type = Type.GetType($"{parameterInfo.ParameterType.Namespace}.{parameterInfo.ParameterType.Name}");
+                if (type == null)
+                {
+                    return new Tuple<string, string>(parameterInfo.ParameterType.Name,
+                        $"{parameterInfo.ParameterType.Namespace}.{parameterInfo.ParameterType.Name}");
+                }
                 return new Tuple<string, string>(type.Name, type.FullName);
             }
             else
