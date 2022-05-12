@@ -39,7 +39,8 @@ namespace PK.Swagger.Extension.Net.Providers {
                     FullName = t.FullName,
                     Name = t.Name,
                     CustomAttributes = t.CustomAttributes,
-                    Summary = GetSummaryFromXML(t.FullName, MemberType.Class)
+                    Summary = GetSummaryFromXML(t.FullName, MemberType.Class),
+                    RoutePrefixAttr = SwaggerExtension.UsedMapMvcAttributeRoutes ? GetRoutePrefix(t.CustomAttributes) : ""
                 };
 
                 controllerNames.Add(controllerInfo);
@@ -53,7 +54,7 @@ namespace PK.Swagger.Extension.Net.Providers {
                 {
                     string actionFullName = $"{method.DeclaringType.FullName}.{method.Name}";
                     var returnTypeResult = GetReturnType(method);
-                    controllerInfo.ActionInfos.Add(new ActionInfo()
+                    var action = new ActionInfo()
                     {
                         FullName = actionFullName,
                         Name = method.Name,
@@ -64,8 +65,13 @@ namespace PK.Swagger.Extension.Net.Providers {
                         Parameters =
                             GetParameters(GetParameterInfos(method), GetActionSummaryFromXML(actionFullName)),
                         ReturnTypeName = returnTypeResult.Item1,
-                        ReturnTypeFullName = returnTypeResult.Item2
-                    });
+                        ReturnTypeFullName = returnTypeResult.Item2,
+                        RouteAttr = SwaggerExtension.UsedMapMvcAttributeRoutes
+                            ? GetActionRoute(method.CustomAttributes)
+                            : ""
+                    };
+                    action.RoutePath = (!string.IsNullOrWhiteSpace(action.RouteAttr) ? $"/{controllerInfo.RoutePrefixAttr}/{action.RouteAttr}" : "").Replace("//", "/");
+                    controllerInfo.ActionInfos.Add(action);
                 }
 
             }
@@ -87,13 +93,17 @@ namespace PK.Swagger.Extension.Net.Providers {
 
                 //遍历控制器下的方法
                 foreach (var actionInfo in controllerInfo.ActionInfos) {
+
+                    if (SwaggerExtension.UsedMapMvcAttributeRoutes && string.IsNullOrWhiteSpace(actionInfo.RoutePath))
+                        continue;
+
                     //请求方式
                     string requestMethod = GetRequestMethod(actionInfo.CustomAttributes);
 
                     //控制器名称
                     var controllerName = controllerInfo.Name;
 
-                    var pathStr = $"\"{actionInfo.Path}\"";
+                    var pathStr = $"\"{(SwaggerExtension.UsedMapMvcAttributeRoutes ? actionInfo.RoutePath : actionInfo.Path)}\"";
                     var tagsStr = $"\"tags\":[\"{controllerName}\"],";
 
                     var summaryStr = $"\"summary\": \"{actionInfo.Summary}\",";
@@ -191,6 +201,40 @@ namespace PK.Swagger.Extension.Net.Providers {
             }
 
             return "get";
+        }
+
+        /// <summary>
+        /// 获取RoutePrefix属性
+        /// </summary>
+        /// <param name="customAttributes"></param>
+        /// <returns></returns>
+        private static string GetRoutePrefix(IEnumerable<CustomAttributeData> customAttributes)
+        {
+            var attr = customAttributes.FirstOrDefault(s =>
+                s.AttributeType == typeof(System.Web.Mvc.RoutePrefixAttribute));
+
+            if (attr != null)
+            {
+                return attr.ConstructorArguments[0].Value?.ToString();
+            }
+
+            return "";
+        }
+
+        /// <summary>
+        /// 获取Action路由属性
+        /// </summary>
+        /// <param name="customAttributes"></param>
+        /// <returns></returns>
+        private static string GetActionRoute(IEnumerable<CustomAttributeData> customAttributes) {
+            var attr = customAttributes.FirstOrDefault(s =>
+                s.AttributeType == typeof(System.Web.Mvc.RouteAttribute));
+
+            if (attr != null) {
+                return attr.ConstructorArguments[0].Value?.ToString();
+            }
+
+            return "";
         }
 
         /// <summary>
@@ -355,6 +399,8 @@ namespace PK.Swagger.Extension.Net.Providers {
         /// </summary>
         public string Summary { get; set; }
 
+        public string RoutePrefixAttr { get; set; }
+
         public IEnumerable<CustomAttributeData> CustomAttributes { get; set; }
 
         public List<ActionInfo> ActionInfos { get; set; }
@@ -367,11 +413,18 @@ namespace PK.Swagger.Extension.Net.Providers {
 
         public string Path { get; set; }
 
+        /// <summary>
+        /// 路由路径
+        /// </summary>
+        public string RoutePath { get; set; }
+
         public string Summary { get; set; }
 
         public string ReturnTypeName { get; set; }
 
         public string ReturnTypeFullName { get; set; }
+
+        public string RouteAttr { get; set; }
 
         public IEnumerable<CustomAttributeData> CustomAttributes { get; set; }
 

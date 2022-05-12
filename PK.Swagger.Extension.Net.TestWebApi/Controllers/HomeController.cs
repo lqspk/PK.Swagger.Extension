@@ -38,5 +38,13 @@ namespace PK.Swagger.Extension.Net.TestWebApi.Controllers
         {
             return Json(new {@state = 1});
         }
+
+        /// <summary>
+        /// 获取数据
+        /// </summary>
+        /// <returns></returns>
+        public async Task<ActionResult> Get() {
+            return Json(new { @state = 1 });
+        }
     }
 }

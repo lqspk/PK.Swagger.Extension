@@ -18,6 +18,8 @@ namespace PK.Swagger.Extension.Net.Extensions
     /// </summary>
     public static class SwaggerExtension
     {
+        internal static bool UsedMapMvcAttributeRoutes = false;
+
         /// <summary>
         /// 自动包括XML注释文件
         /// </summary>
@@ -36,9 +38,12 @@ namespace PK.Swagger.Extension.Net.Extensions
         /// 启用Swagger导出
         /// </summary>
         /// <param name="config"></param>
+        /// <param name="usedMapMvcAttributeRoutes">是否已使用System.Web.Mvc的路由属性</param>
         /// <returns></returns>
-        public static SwaggerEnabledConfiguration EnableSwaggerExport(this SwaggerEnabledConfiguration config)
+        public static SwaggerEnabledConfiguration EnableSwaggerExport(this SwaggerEnabledConfiguration config, bool usedMapMvcAttributeRoutes = false)
         {
+            UsedMapMvcAttributeRoutes = usedMapMvcAttributeRoutes;
+
             var httpConfig = GetHttpConfiguration(config);
             httpConfig.Routes.MapHttpRoute(
                 name: "SwaggerExportRoute",
