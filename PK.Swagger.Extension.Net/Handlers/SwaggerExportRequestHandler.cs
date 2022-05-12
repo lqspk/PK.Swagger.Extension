@@ -42,6 +42,14 @@ namespace PK.Swagger.Extension.Net.Handlers
                         fileName += ".md";
                         break;
                     }
+                    case "ToWebMvcMarkdown":
+                    {
+                        var list = WebMvcExportProvider.GetControllers();
+                        string json = WebMvcExportProvider.CreateJson(list);
+                        httpContent = new ByteArrayContent(await SwaggerExportProvider.CreateWebMvcMarkdownFile(json));
+                        fileName += ".md";
+                        break;
+                    }
                     default:
                     {
                         return request.CreateErrorResponse(HttpStatusCode.NotFound, "action参数无效");

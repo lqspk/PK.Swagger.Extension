@@ -9,7 +9,7 @@ namespace PK.Swagger.Extension.Net.Models
     /// <summary>
     /// 单个接口解释
     /// </summary>
-    public class InterfaceDefinitionModel
+    internal class InterfaceDefinitionModel
     {
         /// <summary>
         /// 接口地址
@@ -60,7 +60,7 @@ namespace PK.Swagger.Extension.Net.Models
     /// <summary>
     /// 接口请求参数
     /// </summary>
-    public class InterfaceRequestParameter
+    internal class InterfaceRequestParameter
     {
         /// <summary>
         /// 参数位置

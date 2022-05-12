@@ -79,7 +79,7 @@ namespace PK.Swagger.Extension.Net.Extensions
         /// 自动获取程序目录下的xml文件
         /// </summary>
         /// <returns></returns>
-        private static string[] GetXmlCommentsPaths() {
+        internal static string[] GetXmlCommentsPaths() {
             DirectoryInfo folder = new DirectoryInfo($"{System.AppDomain.CurrentDomain.BaseDirectory}\\bin\\");
             var files = folder.GetFiles("*.xml");
 

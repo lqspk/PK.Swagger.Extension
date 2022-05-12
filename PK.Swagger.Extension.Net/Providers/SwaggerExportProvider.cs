@@ -14,11 +14,11 @@ namespace PK.Swagger.Extension.Net.Providers
     public class SwaggerExportProvider
     {
         /// <summary>
-        /// 创建MarkDown数据
+        /// 创建WebApi的MarkDown数据
         /// </summary>
         /// <param name="swaggerJsonUrl"></param>
         /// <returns></returns>
-        public static async Task<byte[]> CreateMarkdownFile(string swaggerJsonUrl)
+        internal static async Task<byte[]> CreateMarkdownFile(string swaggerJsonUrl)
         {
             var httpClient = HttpClientFactory.Create();
             HttpResponseMessage responseMessage = await httpClient.GetAsync(swaggerJsonUrl);
@@ -63,6 +63,56 @@ namespace PK.Swagger.Extension.Net.Providers
 
                 foreach (var definition in definitions)
                 {
+                    sb.Append(ClassDefinitionToMarkDown(GetClassDefinition(definition)));
+                }
+            }
+
+            return Encoding.UTF8.GetBytes(sb.ToString());
+        }
+
+        /// <summary>
+        /// 创建WebMvc的MarkDown数据
+        /// </summary>
+        /// <param name="json"></param>
+        /// <returns></returns>
+        internal static async Task<byte[]> CreateWebMvcMarkdownFile(string json) {
+            var jObj = JObject.Parse(json);
+
+
+            //获取接口的定义
+            var paths = jObj["paths"];
+
+            //获取类的定义
+            var definitions = jObj["definitions"];
+
+
+            StringBuilder sb = new StringBuilder();
+
+            sb.AppendLine($"# 接口定义 ");
+            sb.AppendLine("");
+            sb.AppendLine("");
+            sb.AppendLine("");
+
+            //接口序号
+            int i = 0;
+
+            foreach (var jPath in paths) {
+                i++;
+
+                InterfaceDefinitionModel interfaceDefinition = GetInterfaceDefinition(jPath, definitions);
+
+                sb.Append(InterfaceDefinitionToMarkDown(interfaceDefinition, i));
+            }
+
+
+            //类定义
+            if (definitions.Any()) {
+                sb.AppendLine("");
+                sb.AppendLine("");
+                sb.AppendLine("");
+                sb.AppendLine($"# 类定义 ");
+
+                foreach (var definition in definitions) {
                     sb.Append(ClassDefinitionToMarkDown(GetClassDefinition(definition)));
                 }
             }
@@ -123,7 +173,7 @@ namespace PK.Swagger.Extension.Net.Providers
                                       methodProperty?.Value["responses"]?["200"]?["schema"]?["type"])?.ToString();
 
             //如果响应数据是类
-            if (model.ResponseDataType.StartsWith("#/definitions/"))
+            if (model.ResponseDataType?.StartsWith("#/definitions/") == true)
             {
                 //获取类名
                 string className = model.ResponseDataType.Replace("#/definitions/", "");
@@ -133,7 +183,7 @@ namespace PK.Swagger.Extension.Net.Providers
                 ClassDefinitionModel classDefinition = GetClassDefinition(classToken);
 
                 //响应数据
-                model.ResponseProperties = classDefinition.Properties;
+                model.ResponseProperties = classDefinition?.Properties;
             }
 
             return model;
@@ -220,7 +270,7 @@ namespace PK.Swagger.Extension.Net.Providers
             var responseType = interfaceDefinition.ResponseDataType;
             sb.AppendLine($"  - **数据类型：**");
             sb.AppendLine("");
-            sb.AppendLine($"    {responseType.Replace("#/definitions/", "")}");
+            sb.AppendLine($"    {responseType?.Replace("#/definitions/", "")}");
             sb.AppendLine("");
 
             if (interfaceDefinition.ResponseProperties != null && interfaceDefinition.ResponseProperties.Any())
@@ -268,6 +318,8 @@ namespace PK.Swagger.Extension.Net.Providers
         /// <returns></returns>
         private static ClassDefinitionModel GetClassDefinition(JToken classToken)
         {
+            if (classToken == null) return null;
+
             JProperty property = classToken.ToObject<JProperty>();
 
             ClassDefinitionModel classDefinition = new ClassDefinitionModel()

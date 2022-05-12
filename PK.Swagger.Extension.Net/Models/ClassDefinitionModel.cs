@@ -1,15 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 
-namespace PK.Swagger.Extension.Net.Models
-{
+namespace PK.Swagger.Extension.Net.Models {
     /// <summary>
     /// 单个类解释
     /// </summary>
-    public class ClassDefinitionModel
+    internal class ClassDefinitionModel
     {
         /// <summary>
         /// 类名称
@@ -35,7 +30,7 @@ namespace PK.Swagger.Extension.Net.Models
     /// <summary>
     /// 单个类属性
     /// </summary>
-    public class ClassPropertyModel
+    internal class ClassPropertyModel
     {
         /// <summary>
         /// 属性名称
