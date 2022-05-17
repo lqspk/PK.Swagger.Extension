@@ -4,18 +4,23 @@ using PK.Swagger.Extension.Net.Enums;
 using PK.Swagger.Extension.Net.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.Mvc;
 using System.Xml;
+using PK.Swagger.Extension.Net.Attributes;
 
 namespace PK.Swagger.Extension.Net.Providers {
     /// <summary>
     /// 导出Web.Mvc方法
     /// </summary>
     public class WebMvcExportProvider {
+        /// <summary>
+        /// web.mvc返回类型定义
+        /// </summary>
         private static Type[] resultTypes = new[]
         {
             typeof(ActionResult), typeof(ContentResult), typeof(FileResult), typeof(FileStreamResult),
@@ -24,16 +29,30 @@ namespace PK.Swagger.Extension.Net.Providers {
             typeof(Task<JsonResult>), typeof(Task<JavaScriptResult>)
         };
 
+        /// <summary>
+        /// 所有注释XML文件列表
+        /// </summary>
         private static XmlDocument[] xmlDocuments = GetXMLFiles();
+
+        /// <summary>
+        /// 所有参数类、返回数据类列表
+        /// </summary>
+        private static List<Type> classList = null;
 
         /// <summary>
         /// 获取控制器信息
         /// </summary>
         /// <returns></returns>
-        internal static List<ControllerInfo> GetControllers() {
+        internal static List<ControllerInfo> GetControllers()
+        {
+            classList = new List<Type>();
+
             List<ControllerInfo> controllerNames = new List<ControllerInfo>();
 
             foreach (var t in GetSubClasses<Controller>()) {
+                if (t.CustomAttributes.Any(s => s.AttributeType == typeof(HiddenApiAttribute)))
+                    continue;
+
                 //控制器相关信息
                 ControllerInfo controllerInfo = new ControllerInfo() {
                     FullName = t.FullName,
@@ -52,6 +71,12 @@ namespace PK.Swagger.Extension.Net.Providers {
 
                 foreach (var method in methodList)
                 {
+                    if (method.CustomAttributes.Any(s => s.AttributeType == typeof(HiddenApiAttribute)))
+                        continue;
+
+                    var webMvcRequestDataType =
+                        method.CustomAttributes.FirstOrDefault(s => s.AttributeType == typeof(WebMvcRequestDataTypeAttribute));
+
                     string actionFullName = $"{method.DeclaringType.FullName}.{method.Name}";
                     var returnTypeResult = GetReturnType(method);
                     var action = new ActionInfo()
@@ -62,8 +87,9 @@ namespace PK.Swagger.Extension.Net.Providers {
                         CustomAttributes = method.CustomAttributes,
                         Summary =
                             GetSummaryFromXML(actionFullName, MemberType.Action),
-                        Parameters =
-                            GetParameters(GetParameterInfos(method), GetActionSummaryFromXML(actionFullName)),
+                        Parameters = webMvcRequestDataType == null ?
+                            GetParameters(GetParameterInfos(method), GetActionSummaryFromXML(actionFullName))
+                            : GetParameters(webMvcRequestDataType),
                         ReturnTypeName = returnTypeResult.Item1,
                         ReturnTypeFullName = returnTypeResult.Item2,
                         RouteAttr = SwaggerExtension.UsedMapMvcAttributeRoutes
@@ -97,35 +123,117 @@ namespace PK.Swagger.Extension.Net.Providers {
                     if (SwaggerExtension.UsedMapMvcAttributeRoutes && string.IsNullOrWhiteSpace(actionInfo.RoutePath))
                         continue;
 
-                    //请求方式
-                    string requestMethod = GetRequestMethod(actionInfo.CustomAttributes);
-
-                    //控制器名称
-                    var controllerName = controllerInfo.Name;
-
-                    var pathStr = $"\"{(SwaggerExtension.UsedMapMvcAttributeRoutes ? actionInfo.RoutePath : actionInfo.Path)}\"";
-                    var tagsStr = $"\"tags\":[\"{controllerName}\"],";
-
-                    var summaryStr = $"\"summary\": \"{actionInfo.Summary}\",";
-
-                    var parametersStr = JsonConvert.SerializeObject(new { @parameters = actionInfo.Parameters }).Trim(new char[]{'{', '}'}) + ",";
-
-                    var responseStr = "\"responses\":{ \"200\": { \"description\": \"OK\", \"schema\": { \"$ref\": \"#/definitions/" + actionInfo.ReturnTypeName + "\"}}}";
-
-                    var requestMethodStr = $"{requestMethod}\":" + "{" + tagsStr + summaryStr + parametersStr + responseStr + "}";
-
-                    var pathInfo = $"{pathStr}:" + "{\"" + requestMethodStr + " },";
-
-                    sb.Append(pathInfo);
+                    sb.Append(CreateActionJson(actionInfo, controllerInfo.Name));
                 }
             }
 
             //类定义
-            var definitions = "\"definitions\":{}";
+            //遍历类
+            StringBuilder classStringBuilder = new StringBuilder();
+
+            //子类列表
+            List<Type> childClassTypeList = new List<Type>();
+
+            foreach (var classType in classList)
+            {
+                string json = CreateClassJson(classType, ref childClassTypeList);
+
+                classStringBuilder.Append(json);
+            }
+
+            //递归生成子类json
+            while (childClassTypeList.Any())
+            {
+                classList.Concat(childClassTypeList);
+
+                //子类列表
+                List<Type> childClassTypeList1 = new List<Type>();
+
+                foreach (var classType in childClassTypeList) {
+                    string json = CreateClassJson(classType, ref childClassTypeList1);
+
+                    classStringBuilder.Append(json);
+                }
+
+                childClassTypeList = childClassTypeList1;
+            }
+
+            var definitions = "\"definitions\":{" + classStringBuilder.ToString().TrimEnd(',') + "}";
 
             var pathsStr = "{\"paths\":{" + sb.ToString().TrimEnd(',') + "}," + definitions + "}";
 
             return pathsStr;
+        }
+
+        /// <summary>
+        /// 生成控制器方法json
+        /// </summary>
+        /// <param name="actionInfo">方法</param>
+        /// <param name="controllerName">控制器名称</param>
+        /// <returns></returns>
+        private static string CreateActionJson(ActionInfo actionInfo, string controllerName)
+        {
+            //请求方式
+            string requestMethod = GetRequestMethod(actionInfo.CustomAttributes);
+
+            var pathStr = $"\"{(SwaggerExtension.UsedMapMvcAttributeRoutes ? actionInfo.RoutePath : actionInfo.Path)}\"";
+            var tagsStr = $"\"tags\":[\"{controllerName}\"],";
+
+            var summaryStr = $"\"summary\": \"{actionInfo.Summary}\",";
+
+            var contentTypes = GetActionContentType(actionInfo.CustomAttributes);
+            if (contentTypes == null)
+            {
+                contentTypes = requestMethod != "get"
+                    ? new string[] { "application/x-www-form-urlencode" }
+                    : new string[] { };
+            }
+
+            var consumesStr = JsonConvert.SerializeObject(new { consumes = contentTypes }).Trim('{', '}') + ",";
+
+            var parametersStr = JsonConvert.SerializeObject(new { @parameters = actionInfo.Parameters }).Trim(new char[] { '{', '}' }) + ",";
+
+            var responseStr = "\"responses\":{ \"200\": { \"description\": \"OK\", \"schema\": { \"$ref\": \"#/definitions/" + actionInfo.ReturnTypeName + "\"}}}";
+
+            var requestMethodStr = $"{requestMethod}\":" + "{" + tagsStr + summaryStr + consumesStr + parametersStr + responseStr + "}";
+
+            return $"{pathStr}:" + "{\"" + requestMethodStr + " },";
+        }
+
+        /// <summary>
+        /// 生成类的json
+        /// </summary>
+        /// <param name="classType"></param>
+        /// <param name="childClassTypeList"></param>
+        /// <returns></returns>
+        private static string CreateClassJson(Type classType, ref List<Type> childClassTypeList)
+        {
+            var descriptionStr = "\"description\": \"" + GetSummaryFromXML(classType.FullName, MemberType.Class) + "\",";
+            var typeStr = "\"type\": \"object\",";
+
+
+            //获取属性注释列表
+            var propertiesXml = GetClassPropertiesFromXML(classType.FullName);
+
+            //获取属性列表
+            var properties = GetClassProperties(classType.FullName);
+
+            StringBuilder propertyStringBuilder = new StringBuilder();
+            foreach (var property in properties) {
+                var propertyDescription = propertiesXml.Get(property.Name);
+
+                var propertyType = GetParamterType(property.PropertyType, ref childClassTypeList);
+
+                var propertyTypeStr = string.IsNullOrWhiteSpace(propertyType.Item3)
+                    ? propertyType.Item1
+                    : $"{propertyType.Item3}<{propertyType.Item1}>";
+
+                propertyStringBuilder.Append($"\"{property.Name}\": " + "{ \"format\": \"\", \"description\":\"" + propertyDescription + "\",\"type\": \"" + propertyTypeStr + "\"},");
+            }
+
+            var propertiesStr = "\"properties\": {" + propertyStringBuilder.ToString().TrimEnd(',') + "}";
+
+            return $"\"{classType.Name}\": " + "{" + descriptionStr + typeStr + propertiesStr + "},";
         }
 
         /// <summary>
@@ -146,6 +254,21 @@ namespace PK.Swagger.Extension.Net.Providers {
             }
 
             return types;
+        }
+
+        private static Type GetSubClasses(string typeFulleName) {
+            foreach (System.Reflection.Assembly assembly in System.AppDomain.CurrentDomain.GetAssemblies()) {
+                try
+                {
+                    var type = assembly.GetTypes().FirstOrDefault(s => s.FullName == typeFulleName);
+                    if (type != null)
+                        return type;
+
+                } catch {
+                }
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -243,7 +366,27 @@ namespace PK.Swagger.Extension.Net.Providers {
         }
 
         /// <summary>
-        /// 获取参数
+        /// 获取Action的Content-Type
+        /// </summary>
+        /// <param name="customAttributes"></param>
+        /// <returns></returns>
+        private static string[] GetActionContentType(IEnumerable<CustomAttributeData> customAttributes) {
+            var attr = customAttributes.FirstOrDefault(s =>
+                s.AttributeType == typeof(WebMvcContentTypeAttribute));
+
+            if (attr != null)
+            {
+                var arr = (System.Collections.ObjectModel.ReadOnlyCollection<System.Reflection.CustomAttributeTypedArgument>)attr.ConstructorArguments[0].Value;
+
+                return arr?.Select(s => s.Value?.ToString()).ToArray();
+            }
+
+            return new string[]{};
+        }
+
+
+        /// <summary>
+        /// 获取参数及注释
         /// </summary>
         /// <param name="parameterInfos">参数列表</param>
         /// <param name="node">XML注释</param>
@@ -264,7 +407,7 @@ namespace PK.Swagger.Extension.Net.Providers {
                     description = node?.SelectSingleNode($"//param[@name='{parameterInfo.Name}']")?.InnerText,
                     required = (parameterInfo.HasDefaultValue == false && parameterInfo.ParameterType.IsValueType == true) 
                                && parameterInfo.ParameterType.Name.Contains("Nullable`1") == false,
-                    type = paramterType?.Item1,
+                    type = string.IsNullOrWhiteSpace(paramterType.Item3) ? paramterType?.Item1 : $"{paramterType.Item3}<{paramterType.Item1}>",
                     format = ""//paramterType.Item2
                 };
 
@@ -274,27 +417,148 @@ namespace PK.Swagger.Extension.Net.Providers {
             return actionParameterInfos;
         }
 
+        private static List<ActionParameterInfo> GetParameters(CustomAttributeData attr)
+        {
+            List<ActionParameterInfo> actionParameterInfos = new List<ActionParameterInfo>();
+            if (attr != null)
+            {
+                if (attr.ConstructorArguments.Count == 2)
+                {
+                    string data = attr.ConstructorArguments[0].Value?.ToString();
+                    string description = attr.ConstructorArguments[1].Value?.ToString();
+
+                    ActionParameterInfo actionParameterInfo = new ActionParameterInfo() {
+                        name = data,
+                        @in = "query",
+                        description = description
+                    };
+
+                    actionParameterInfos.Add(actionParameterInfo);
+                }
+                else
+                {
+                    var value = attr.ConstructorArguments[0].Value as Type;
+
+                    List<Type> childClassTypeList = new List<Type>();
+                    var paramterType = GetParamterType(value, ref childClassTypeList);
+                    classList.AddRange(childClassTypeList);
+
+                    ActionParameterInfo actionParameterInfo = new ActionParameterInfo() {
+                        name = value.Name,
+                        @in = "query",
+                        description = GetSummaryFromXML(value.FullName, MemberType.Class),
+                        required = false,
+                        type = string.IsNullOrWhiteSpace(paramterType.Item3) ? paramterType?.Item1 : $"{paramterType.Item3}<{paramterType.Item1}>",
+                        format = ""//paramterType.Item2
+                    };
+
+                    actionParameterInfos.Add(actionParameterInfo);
+                }
+            }
+
+            return actionParameterInfos;
+        }
+
+        /// <summary>
+        /// 根据类名称获取类属性
+        /// </summary>
+        /// <param name="classFullName"></param>
+        /// <returns></returns>
+        private static PropertyInfo[] GetClassProperties(string classFullName)
+        {
+            var type = Type.GetType(classFullName);
+            if (type == null)
+                type = GetSubClasses(classFullName);
+
+            if (type == null)
+            {
+                return new PropertyInfo[]{};
+            }
+
+            return type.GetProperties();
+        }
+
         /// <summary>
         /// 获取参数类型
         /// </summary>
         /// <param name="parameterInfo"></param>
-        /// <returns></returns>
-        private static Tuple<string, string> GetParamterType(System.Reflection.ParameterInfo parameterInfo)
+        /// <returns>Item1：实际类型名称, Item2：实际类型完整名称，Item3：属性类型名称</returns>
+        private static Tuple<string, string, string> GetParamterType(System.Reflection.ParameterInfo parameterInfo)
         {
-            if (parameterInfo.ParameterType.Name.Contains("Nullable`1") == false)
+            if (parameterInfo.ParameterType.Name.Contains("`1") == false)
             {
-                var type = Type.GetType($"{parameterInfo.ParameterType.Namespace}.{parameterInfo.ParameterType.Name}");
+                string typeFullName = $"{parameterInfo.ParameterType.Namespace}.{parameterInfo.ParameterType.Name}";
+                var type = Type.GetType(typeFullName);
+                if (type == null)
+                    type = GetSubClasses(typeFullName);
+
                 if (type == null)
                 {
-                    return new Tuple<string, string>(parameterInfo.ParameterType.Name,
-                        $"{parameterInfo.ParameterType.Namespace}.{parameterInfo.ParameterType.Name}");
+                    return new Tuple<string, string, string>(parameterInfo.ParameterType.Name,
+                        $"{parameterInfo.ParameterType.Namespace}.{parameterInfo.ParameterType.Name}", "");
                 }
-                return new Tuple<string, string>(type.Name, type.FullName);
+
+                if (type.IsClass && type.Name != "String" && type.Name != "Object") {
+                    if (classList.Any(s => s.FullName == type.FullName) == false)
+                        classList.Add(type);
+                }
+
+                return new Tuple<string, string, string>(type.Name, type.FullName, "");
             }
             else
             {
                 var type = parameterInfo.ParameterType.GenericTypeArguments[0];
-                return new Tuple<string, string>(type.Name, type.FullName);
+                if (type.IsClass && type.Name != "String" && type.Name != "Object")
+                {
+                    if (classList.Any(s => s.FullName == type.FullName) == false)
+                        classList.Add(type);
+                }
+
+                if (parameterInfo.ParameterType.Name.Contains("Nullable"))
+                {
+                    return new Tuple<string, string, string>(type.Name, type.FullName, "");
+                }
+
+                return new Tuple<string, string, string>(type.Name, type.FullName, parameterInfo.ParameterType.Name.Replace("`1", ""));
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="propertyType"></param>
+        /// <param name="childClassTypeList"></param>
+        /// <returns>Item1：实际类型名称, Item2：实际类型完整名称，Item3：属性类型名称</returns>
+        private static Tuple<string, string, string> GetParamterType(Type propertyType, ref List<Type> childClassTypeList) {
+            if (propertyType.Name.Contains("`1") == false) {
+                string typeFullName = $"{propertyType.Namespace}.{propertyType.Name}";
+                var type = Type.GetType(typeFullName);
+                if (type == null)
+                    type = GetSubClasses(typeFullName);
+
+                if (type == null) {
+                    return new Tuple<string, string, string>(propertyType.Name,
+                        $"{propertyType.Namespace}.{propertyType.Name}", "");
+                }
+
+                if (childClassTypeList != null && type.IsClass && type.Name != "String" && type.Name != "Object") {
+                    if (classList.Any(s => s.FullName == type.FullName) == false && childClassTypeList.Any(s => s.FullName == type.FullName) == false)
+                        childClassTypeList.Add(type);
+                }
+
+                return new Tuple<string, string, string>(type.Name, type.FullName, "");
+            } else {
+                var type = propertyType.GenericTypeArguments[0];
+                if (childClassTypeList != null && type.IsClass && type.Name != "String" && type.Name != "Object") {
+                    if (classList.Any(s => s.FullName == type.FullName) == false && childClassTypeList.Any(s => s.FullName == type.FullName) == false)
+                        childClassTypeList.Add(type);
+                }
+
+                if (propertyType.Name.Contains("Nullable")) {
+                    return new Tuple<string, string, string>(type.Name, type.FullName, "");
+                }
+
+                return new Tuple<string, string, string>(type.Name, type.FullName, propertyType.Name.Replace("`1", ""));
             }
         }
 
@@ -305,6 +569,14 @@ namespace PK.Swagger.Extension.Net.Providers {
         /// <returns></returns>
         private static Tuple<string, string> GetReturnType(MethodInfo methodInfo)
         {
+            var responseDataTypeAttr =
+                methodInfo.CustomAttributes.FirstOrDefault(s => s.AttributeType == typeof(WebMvcResponseDataTypeAttribute));
+            if (responseDataTypeAttr != null)
+            {
+                var type = responseDataTypeAttr.ConstructorArguments[0].Value as Type;
+                return new Tuple<string, string>(type.Name, type.FullName);
+            }
+
             if (methodInfo.ReturnType.Name.Contains("Task`1"))
             {
                 return new Tuple<string, string>(methodInfo.ReturnType.GenericTypeArguments[0].Name, methodInfo.ReturnType.GenericTypeArguments[0].FullName);
@@ -380,6 +652,42 @@ namespace PK.Swagger.Extension.Net.Providers {
         }
 
         /// <summary>
+        /// 获取类下的属性
+        /// </summary>
+        /// <param name="classFullName"></param>
+        /// <returns></returns>
+        private static NameValueCollection GetClassPropertiesFromXML(string classFullName)
+        {
+            NameValueCollection nameValueCollection = new NameValueCollection();
+
+            foreach (var xmlDocument in xmlDocuments) 
+            {
+                var nodes = xmlDocument.SelectNodes("//member");
+                foreach (XmlNode node in nodes) {
+                    if (node.Attributes["name"]?.Value == $"T:{classFullName}")
+                    {
+                        var nextNode = node.NextSibling;
+                        var nextNodeValue = nextNode.Attributes["name"]?.Value;
+                        while (nextNodeValue?.StartsWith("P:") == true)
+                        {
+                            var propertiesName = nextNodeValue.Replace("P:", "").Replace(classFullName, "")
+                                .TrimStart('.');
+                            var summary = nextNode.SelectSingleNode("summary")?.InnerText.Trim().Trim(new char[] { '\r', '\n' }).Trim();
+
+                            nameValueCollection.Add(propertiesName, summary);
+
+                            nextNode = nextNode.NextSibling;
+
+                            nextNodeValue = nextNode?.Attributes["name"]?.Value;
+                        }
+                    }
+                }
+            }
+
+            return nameValueCollection;
+        }
+
+        /// <summary>
         /// 读取XML文件
         /// </summary>
         /// <returns></returns>
@@ -399,6 +707,9 @@ namespace PK.Swagger.Extension.Net.Providers {
         }
     }
 
+    /// <summary>
+    /// 控制器信息
+    /// </summary>
     internal class ControllerInfo {
         public string FullName { get; set; }
 
@@ -416,6 +727,9 @@ namespace PK.Swagger.Extension.Net.Providers {
         public List<ActionInfo> ActionInfos { get; set; }
     }
 
+    /// <summary>
+    /// 控制器下的方法信息
+    /// </summary>
     internal class ActionInfo {
         public string FullName { get; set; }
 
@@ -441,6 +755,9 @@ namespace PK.Swagger.Extension.Net.Providers {
         public List<ActionParameterInfo> Parameters { get; set; }
     }
 
+    /// <summary>
+    /// 方法参数信息
+    /// </summary>
     internal class ActionParameterInfo
     {
         public string name { get; set; }

@@ -19,7 +19,7 @@ namespace PK.Swagger.Extension.Net.TestModel
         /// <summary>
         /// 性别
         /// </summary>
-        public bool Sex { get; set; }
+        public bool? Sex { get; set; }
 
         /// <summary>
         /// 年龄
@@ -30,5 +30,7 @@ namespace PK.Swagger.Extension.Net.TestModel
         /// 生日
         /// </summary>
         public DateTime Birthday { get; set; }
+
+        public List<UserModel> Users { get; set; }
     }
 }

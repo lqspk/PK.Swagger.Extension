@@ -7,6 +7,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Xml.XPath;
+using PK.Swagger.Extension.Net.Attributes;
 
 [assembly: PreApplicationStartMethod(typeof(SwaggerConfig), "Register")]
 
@@ -170,6 +171,7 @@ namespace PK.Swagger.Extension.Net.TestWebApi
                         // before using this option.
                         //
                         //c.DocumentFilter<ApplyDocumentVendorExtensions>();
+                        c.DocumentFilter<HiddenApiFilter>();
 
                         // In contrast to WebApi, Swagger 2.0 does not include the query string component when mapping a URL
                         // to an action. As a result, Swashbuckle will raise an exception if it encounters multiple actions

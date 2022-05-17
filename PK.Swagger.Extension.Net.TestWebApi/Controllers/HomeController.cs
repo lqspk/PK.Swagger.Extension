@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Web;
 using System.Web.Http;
 using System.Web.Mvc;
+using PK.Swagger.Extension.Net.Attributes;
 using PK.Swagger.Extension.Net.Enums;
 using PK.Swagger.Extension.Net.Providers;
 
@@ -34,6 +35,8 @@ namespace PK.Swagger.Extension.Net.TestWebApi.Controllers
         /// <param name="data"></param>
         /// <returns></returns>
         [System.Web.Mvc.HttpPost]
+        [WebMvcRequestDataType("123", "测试参数")]
+        [WebMvcContentType(new string[]{ "application/x-www-form-urlencoded", "application/json" })]
         public async Task<ActionResult> Save(dynamic data)
         {
             return Json(new {@state = 1});
@@ -42,9 +45,17 @@ namespace PK.Swagger.Extension.Net.TestWebApi.Controllers
         /// <summary>
         /// 获取数据
         /// </summary>
+        /// <param name="model">测试模型</param>
         /// <returns></returns>
-        public async Task<ActionResult> Get() {
-            return Json(new { @state = 1 });
+        [WebMvcRequestDataType(typeof(TestModel.TestModel))]
+        [WebMvcResponseDataType(typeof(TestModel.TestModel))]
+        public async Task<ActionResult> Get(TestModel.TestModel model) {
+            return Json(new { @model = new TestModel.TestModel() });
+        }
+
+        [HiddenApi]
+        public async Task<ActionResult> Hide() {
+            return Json(new { @model = new TestModel.TestModel() });
         }
     }
 }
