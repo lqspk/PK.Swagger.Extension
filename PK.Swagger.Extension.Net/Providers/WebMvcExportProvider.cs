@@ -657,13 +657,10 @@ namespace PK.Swagger.Extension.Net.Providers {
                     }
                 }
                 else if (memberType == MemberType.Action) {
-                    var nodes = xmlDocument.SelectNodes("//member");
-                    foreach (XmlNode node in nodes)
+                    var node = xmlDocument.SelectSingleNode($"//member[contains(@name, '{prefix}:{name}(')]");
+                    if (node != null)
                     {
-                        if (node.Attributes["name"]?.Value.Contains($"{prefix}:{name}(") == true)
-                        {
-                            return node.SelectSingleNode("summary")?.InnerText.Trim().Trim(new char[] { '\r', '\n' }).Trim();
-                        }
+                        return node.SelectSingleNode("summary")?.InnerText.Trim().Trim(new char[] { '\r', '\n' }).Trim();
                     }
                 }
             }
@@ -678,13 +675,11 @@ namespace PK.Swagger.Extension.Net.Providers {
         /// <returns></returns>
         private static XmlNode GetActionSummaryFromXML(string actionName)
         {
-            foreach (var xmlDocument in xmlDocuments) {
-                var nodes = xmlDocument.SelectNodes("//member");
-                foreach (XmlNode node in nodes) {
-                    if (node.Attributes["name"]?.Value.Contains($"M:{actionName}(") == true) {
-                        return node;
-                    }
-                }
+            foreach (var xmlDocument in xmlDocuments) 
+            {
+                var node = xmlDocument.SelectSingleNode($"//member[contains(@name, 'M:{actionName}(')]");
+                if (node != null)
+                    return node;
             }
 
             return null;
