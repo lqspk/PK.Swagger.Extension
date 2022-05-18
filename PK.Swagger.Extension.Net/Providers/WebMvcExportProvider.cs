@@ -92,6 +92,7 @@ namespace PK.Swagger.Extension.Net.Providers {
                             : GetParameters(webMvcRequestDataType),
                         ReturnTypeName = returnTypeResult.Item1,
                         ReturnTypeFullName = returnTypeResult.Item2,
+                        ReturnDescription = returnTypeResult.Item3,
                         RouteAttr = SwaggerExtension.UsedMapMvcAttributeRoutes
                             ? GetActionRoute(method.CustomAttributes)
                             : ""
@@ -193,7 +194,7 @@ namespace PK.Swagger.Extension.Net.Providers {
 
             var parametersStr = JsonConvert.SerializeObject(new { @parameters = actionInfo.Parameters }).Trim(new char[] { '{', '}' }) + ",";
 
-            var responseStr = "\"responses\":{ \"200\": { \"description\": \"OK\", \"schema\": { \"$ref\": \"#/definitions/" + actionInfo.ReturnTypeName + "\"}}}";
+            var responseStr = "\"responses\":{ \"200\": { \"description\": \"" + (!string.IsNullOrWhiteSpace(actionInfo.ReturnDescription) ? actionInfo.ReturnDescription : "OK") + "\", \"schema\": { \"$ref\": \"#/definitions/" + actionInfo.ReturnTypeName + "\"}}}";
 
             var requestMethodStr = $"{requestMethod}\":" + "{" + tagsStr + summaryStr + consumesStr + parametersStr + responseStr + "}";
 
@@ -577,29 +578,50 @@ namespace PK.Swagger.Extension.Net.Providers {
         /// 获取返回类型
         /// </summary>
         /// <param name="methodInfo"></param>
-        /// <returns></returns>
-        private static Tuple<string, string> GetReturnType(MethodInfo methodInfo)
+        /// <returns>Item1：类型简称；Item2，类型完全名称；Item3：描述</returns>
+        private static Tuple<string, string, string> GetReturnType(MethodInfo methodInfo)
         {
             var responseDataTypeAttr =
                 methodInfo.CustomAttributes.FirstOrDefault(s => s.AttributeType == typeof(WebMvcResponseDataTypeAttribute));
             if (responseDataTypeAttr != null)
             {
-                var type = responseDataTypeAttr.ConstructorArguments[0].Value as Type;
+                if (responseDataTypeAttr.ConstructorArguments.Count == 1)
+                {
+                    var type = responseDataTypeAttr.ConstructorArguments[0].Value as Type;
 
-                if (type.IsClass && type.Name != "String" && type.Name != "Object") {
-                    if (classList.Any(s => s.FullName == type.FullName) == false)
-                        classList.Add(type);
+                    if (type.IsClass && type.Name != "String" && type.Name != "Object") {
+                        if (classList.Any(s => s.FullName == type.FullName) == false)
+                            classList.Add(type);
+                    }
+
+                    return new Tuple<string, string, string>(type.Name, type.FullName, null);
                 }
+                else
+                {
+                    List<Type> typeList = new List<Type>();
+                    var typeArguments = responseDataTypeAttr.ConstructorArguments[0].Value as System.Collections.ObjectModel.ReadOnlyCollection<System.Reflection.CustomAttributeTypedArgument>;
+                    var description = responseDataTypeAttr.ConstructorArguments[1].Value?.ToString();
+                    foreach (var typeArgument in typeArguments)
+                    {
+                        var type = typeArgument.Value as Type;
+                        typeList.Add(type);
 
-                return new Tuple<string, string>(type.Name, type.FullName);
+                        if (type.IsClass && type.Name != "String" && type.Name != "Object") {
+                            if (classList.Any(s => s.FullName == type.FullName) == false)
+                                classList.Add(type);
+                        }
+                    }
+
+                    return new Tuple<string, string, string>(string.Join("、", typeList.Select(s => s.Name)), string.Join("、", typeList.Select(s => s.FullName)), description);
+                }
             }
 
             if (methodInfo.ReturnType.Name.Contains("`1"))
             {
-                return new Tuple<string, string>(methodInfo.ReturnType.GenericTypeArguments[0].Name, methodInfo.ReturnType.GenericTypeArguments[0].FullName);
+                return new Tuple<string, string, string>(methodInfo.ReturnType.GenericTypeArguments[0].Name, methodInfo.ReturnType.GenericTypeArguments[0].FullName, null);
             }
 
-            return new Tuple<string, string>(methodInfo.ReturnType.Name, methodInfo.ReturnType.FullName);
+            return new Tuple<string, string, string>(methodInfo.ReturnType.Name, methodInfo.ReturnType.FullName, null);
         }
 
         /// <summary>
@@ -775,6 +797,8 @@ namespace PK.Swagger.Extension.Net.Providers {
         public string ReturnTypeName { get; set; }
 
         public string ReturnTypeFullName { get; set; }
+
+        public string ReturnDescription { get; set; }
 
         public string RouteAttr { get; set; }
 

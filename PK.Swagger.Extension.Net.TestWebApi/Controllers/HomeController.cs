@@ -48,7 +48,7 @@ namespace PK.Swagger.Extension.Net.TestWebApi.Controllers
         /// <param name="model">测试模型</param>
         /// <returns></returns>
         [WebMvcRequestDataType(typeof(TestModel.TestModel))]
-        [WebMvcResponseDataType(typeof(TestModel.TestModel))]
+        [WebMvcResponseDataType(new Type[]{typeof(TestModel.TestModel), typeof(TestModel.UserModel)}, "测试描述")]
         public async Task<ActionResult> Get(TestModel.TestModel model) {
             return Json(new { @model = new TestModel.TestModel() });
         }

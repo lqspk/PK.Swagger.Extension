@@ -47,6 +47,11 @@ namespace PK.Swagger.Extension.Net.Models
         public string ResponseDataType { get; set; }
 
         /// <summary>
+        /// 响应数据描述
+        /// </summary>
+        public string ResponseDataDescription { get; set; }
+
+        /// <summary>
         /// 接口请求参数
         /// </summary>
         public List<InterfaceRequestParameter> RequestParameters { get; set; }

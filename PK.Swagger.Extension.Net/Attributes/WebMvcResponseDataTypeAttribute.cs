@@ -11,5 +11,9 @@ namespace PK.Swagger.Extension.Net.Attributes {
         {
 
         }
+
+        public WebMvcResponseDataTypeAttribute(Type[] t, string description) {
+
+        }
     }
 }

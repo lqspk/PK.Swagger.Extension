@@ -172,6 +172,9 @@ namespace PK.Swagger.Extension.Net.Providers
             model.ResponseDataType = (methodProperty?.Value["responses"]?["200"]?["schema"]?["$ref"] ??
                                       methodProperty?.Value["responses"]?["200"]?["schema"]?["type"])?.ToString();
 
+            //响应数据描述
+            model.ResponseDataDescription = methodProperty?.Value["responses"]?["200"]?["description"]?.ToString();
+
             //如果响应数据是类
             if (model.ResponseDataType?.StartsWith("#/definitions/") == true)
             {
@@ -272,6 +275,14 @@ namespace PK.Swagger.Extension.Net.Providers
             sb.AppendLine("");
             sb.AppendLine($"    {responseType?.Replace("#/definitions/", "")}");
             sb.AppendLine("");
+
+            if (interfaceDefinition.ResponseDataDescription != "OK")
+            {
+                sb.AppendLine($"  - **数据描述：**");
+                sb.AppendLine("");
+                sb.AppendLine("    " + interfaceDefinition.ResponseDataDescription);
+                sb.AppendLine("");
+            }
 
             if (interfaceDefinition.ResponseProperties != null && interfaceDefinition.ResponseProperties.Any())
             {
