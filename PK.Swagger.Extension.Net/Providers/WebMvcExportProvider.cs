@@ -214,6 +214,17 @@ namespace PK.Swagger.Extension.Net.Providers {
 
             //获取属性注释列表
             var propertiesXml = GetClassPropertiesFromXML(classType.FullName);
+            Type baseType = classType.BaseType;
+            while (baseType != null && baseType.IsClass && baseType.Name != "Object")
+            {
+                var parentPropertiesXml = GetClassPropertiesFromXML(baseType.FullName);
+                foreach (string key in parentPropertiesXml.AllKeys)
+                {
+                    propertiesXml.Add(key, parentPropertiesXml[key]);
+                }
+
+                baseType = baseType.BaseType;
+            }
 
             //获取属性列表
             var properties = GetClassProperties(classType.FullName);
@@ -404,9 +415,9 @@ namespace PK.Swagger.Extension.Net.Providers {
                 {
                     name = parameterInfo.Name,
                     @in = "query",
-                    description = node?.SelectSingleNode($"//param[@name='{parameterInfo.Name}']")?.InnerText,
+                    description = node?.SelectSingleNode($"param[@name='{parameterInfo.Name}']")?.InnerText,
                     required = (parameterInfo.HasDefaultValue == false && parameterInfo.ParameterType.IsValueType == true) 
-                               && parameterInfo.ParameterType.Name.Contains("Nullable`1") == false,
+                               && parameterInfo.ParameterType.Name.Contains("`1") == false,
                     type = string.IsNullOrWhiteSpace(paramterType.Item3) ? paramterType?.Item1 : $"{paramterType.Item3}<{paramterType.Item1}>",
                     format = ""//paramterType.Item2
                 };
@@ -574,10 +585,16 @@ namespace PK.Swagger.Extension.Net.Providers {
             if (responseDataTypeAttr != null)
             {
                 var type = responseDataTypeAttr.ConstructorArguments[0].Value as Type;
+
+                if (type.IsClass && type.Name != "String" && type.Name != "Object") {
+                    if (classList.Any(s => s.FullName == type.FullName) == false)
+                        classList.Add(type);
+                }
+
                 return new Tuple<string, string>(type.Name, type.FullName);
             }
 
-            if (methodInfo.ReturnType.Name.Contains("Task`1"))
+            if (methodInfo.ReturnType.Name.Contains("`1"))
             {
                 return new Tuple<string, string>(methodInfo.ReturnType.GenericTypeArguments[0].Name, methodInfo.ReturnType.GenericTypeArguments[0].FullName);
             }
@@ -662,24 +679,35 @@ namespace PK.Swagger.Extension.Net.Providers {
 
             foreach (var xmlDocument in xmlDocuments) 
             {
-                var nodes = xmlDocument.SelectNodes("//member");
-                foreach (XmlNode node in nodes) {
-                    if (node.Attributes["name"]?.Value == $"T:{classFullName}")
+                var classNode = xmlDocument.SelectSingleNode($"//member[@name='T:{classFullName}']");
+                if (classNode != null)
+                {
+                    var nextNode = classNode.NextSibling;
+                    var nextNodeValue = nextNode.Attributes["name"]?.Value;
+                    while (nextNodeValue?.StartsWith("P:") == true)
                     {
-                        var nextNode = node.NextSibling;
-                        var nextNodeValue = nextNode.Attributes["name"]?.Value;
-                        while (nextNodeValue?.StartsWith("P:") == true)
-                        {
-                            var propertiesName = nextNodeValue.Replace("P:", "").Replace(classFullName, "")
-                                .TrimStart('.');
-                            var summary = nextNode.SelectSingleNode("summary")?.InnerText.Trim().Trim(new char[] { '\r', '\n' }).Trim();
+                        var propertiesName = nextNodeValue.Replace("P:", "").Replace(classFullName, "")
+                            .TrimStart('.');
+                        var summary = nextNode.SelectSingleNode("summary")?.InnerText.Trim().Trim(new char[] { '\r', '\n' }).Trim();
 
-                            nameValueCollection.Add(propertiesName, summary);
+                        nameValueCollection.Add(propertiesName, summary);
 
-                            nextNode = nextNode.NextSibling;
+                        nextNode = nextNode.NextSibling;
 
-                            nextNodeValue = nextNode?.Attributes["name"]?.Value;
-                        }
+                        nextNodeValue = nextNode?.Attributes["name"]?.Value;
+                    }
+                }
+                else 
+                {
+                    var propertyNodes = xmlDocument.SelectNodes($"//member[contains(@name, 'P:{classFullName}.')]");
+                    foreach (XmlNode node in propertyNodes)
+                    {
+                        var nodeValue = node.Attributes["name"]?.Value;
+                        var propertiesName = nodeValue.Replace("P:", "").Replace(classFullName, "")
+                            .TrimStart('.');
+                        var summary = node.SelectSingleNode("summary")?.InnerText.Trim().Trim(new char[] { '\r', '\n' }).Trim();
+
+                        nameValueCollection.Add(propertiesName, summary);
                     }
                 }
             }

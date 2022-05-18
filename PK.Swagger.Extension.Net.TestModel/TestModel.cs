@@ -6,11 +6,18 @@ using System.Threading.Tasks;
 
 namespace PK.Swagger.Extension.Net.TestModel
 {
+    public class BaseModel
+    {
+        /// <summary>
+        /// Id
+        /// </summary>
+        public string Id { get; set; }
+    }
+
     /// <summary>
     /// 测试模型
     /// </summary>
-    public class TestModel
-    {
+    public class TestModel : BaseModel {
         /// <summary>
         /// 姓名
         /// </summary>
