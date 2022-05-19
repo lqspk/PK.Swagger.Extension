@@ -478,13 +478,17 @@ namespace PK.Swagger.Extension.Net.Providers {
         /// <returns></returns>
         private static PropertyInfo[] GetClassProperties(string classFullName)
         {
+            if (string.IsNullOrWhiteSpace(classFullName))
+            {
+                return new PropertyInfo[] { };
+            }
+
             var type = Type.GetType(classFullName);
             if (type == null)
                 type = GetSubClasses(classFullName);
 
-            if (type == null)
-            {
-                return new PropertyInfo[]{};
+            if (type == null) {
+                return new PropertyInfo[] { };
             }
 
             return type.GetProperties();
